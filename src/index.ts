@@ -15,89 +15,89 @@ import {
  * Represents the fundamental color context in a design system.
  * Includes background and foreground designations in both short and full forms.
  */
-type ColorScope = "bg" | "fg" | "foreground" | "background" | "accent" | "primary" | "secondary"
-
-/**
- * A color token with scope as prefix (e.g., "bg.primary", "fg.accent").
- * Used to explicitly define whether a color is for background or foreground.
- */
-type ScopedColorToken = `${ColorScope}.${string}`
-
-/**
- * A color token with namespace as prefix and scope as suffix (e.g., "button.bg", "card.fg").
- * Used to group related colors by component or element name.
- */
-type NamespacedColorToken = `${string}.${ColorScope}`
+type DefaultColorScope = "bg" | "fg" | "foreground" | "background" | "accent" | "primary" | "secondary"
 
 /**
  * Represents any valid theme token, including scoped and namespaced variants.
  * General format is "namespace.name" with special handling for scope-specific tokens.
  */
-type ThemeToken = `${string}.${string}` | ScopedColorToken | NamespacedColorToken
+type TokenName = `${string}.${string}`
 
 /**
  * Supported color value formats that can be processed by the theming system.
  * Includes hex, RGB(A), and HSL(A) formats with proper type definitions.
  */
-type ColorFormat =
+type ColorValue =
   | `#${string}`
   | `rgb(${number}, ${number}, ${number})`
   | `rgba(${number}, ${number}, ${number}, ${number})`
   | `hsl(${number}, ${number}%, ${number}%)`
   | `hsla(${number}, ${number}%, ${number}%, ${number})`
-type Divider<T> = T extends "." ? never : T
+  | `hsv(${number}, ${number}%, ${number}%)`
+  | `hsva(${number}, ${number}%, ${number}%, ${number})`
+  | `cmyk(${number}, ${number}%, ${number}%, ${number}%)`
+  | `cmyka(${number}, ${number}%, ${number}%, ${number}%, ${number})`
 
 /**
- * Highly flexible, but type-safe way to enforce a key format.
+ * Formats a token string by replacing dividers, adding prefix/suffix, and
+ * ensuring no double-formatting.
  *
- * Has safety checks to avoid infinite recursions.
- * Also ensure that the format is not applied twice, or formatted incorrectly.
- *
- * @param T The string to replace the divider in.
- * @param D The divider to replace.
- * @param R The string to replace the divider with.
- * @param P The prefix to add to the string.
- * @returns The modified string with the divider replaced and the prefix added.
- * @example
- * ```ts
- * TokenFormatter<"foo.bar.baz", ".", "-", "--", "dark"> // '--foo-bar-baz-dark'
- * ```
+ * @template T     - Original token name (e.g. "button.primary")
+ * @template Del   - Original divider (default ".")
+ * @template Rep   - Replacement character (default "-")
+ * @template Pre   - Prefix to add (e.g. "--")
+ * @template Suf   - Suffix to add after formatting
+ * @template Scope - Color scopes (e.g. "bg", "fg")
  */
-type TokenFormatter<
+type FormatToken<
   T extends string,
-  D extends string = ".",
-  R extends string = "-",
-  P extends string = "",
-  S extends string = "",
-> = R extends "."
-  ? SuffixInjector<S, R, PrefixInjector<P, T>>
-  : D extends ""
-    ? D extends R
-      ? SuffixInjector<S, R, PrefixInjector<P, T>>
-      : SuffixInjector<S, R, PrefixInjector<P, T>>
-    : T extends `${infer Prefix}${D}${infer Suffix}`
-      ? TokenFormatter<`${Prefix}${R}${Suffix}`, D, R, P, S>
-      : SuffixInjector<S, R, PrefixInjector<P, T>>
+  Del extends string = ".",
+  Rep extends string = "-",
+  Pre extends string = "",
+  Suf extends string = "",
+  Scope extends string = DefaultColorScope,
+> = Rep extends "."
+  ? InjectSuffix<InjectPrefix<T, Pre>, Suf, Rep, Scope>
+  : Del extends ""
+    ? Del extends Rep
+      ? InjectSuffix<InjectPrefix<T, Pre>, Suf, Rep, Del, Scope>
+      : InjectSuffix<InjectPrefix<T, Pre>, Suf, Rep, Del, Scope>
+    : T extends `${infer Prefix}${Del}${infer Suffix}`
+      ? FormatToken<`${Prefix}${Rep}${Suffix}`, Del, Rep, Pre, Suf, Scope>
+      : InjectSuffix<InjectPrefix<T, Pre>, Suf, Rep, Del, Scope>
 
 /**
- * Appends a prefix to a string if it doesn't already start with that prefix.
+ * Injects a prefix into a string if it doesn't already start with it.
  *
- * Has a safety check to ensure that the prefix is not empty.
- * Also checks if the string already starts with the prefix.
- *
- * @param P The prefix to add.
- * @param T The string to append the prefix to.
- * @returns The modified string with the prefix added.
- * @example
- * ```ts
- * PrefixInjector<"--", "bar", "@"> // '--bar@'
+ * @template T - The target string
+ * @template Pre - The prefix to inject
+ * @returns The target string with the prefix injected if necessary
  */
-type PrefixInjector<P extends string, T extends string> = P extends "" ? T : T extends `${P}${string}` ? T : `${P}${T}`
-type SuffixInjector<S extends string, R extends string, T extends string> = S extends ""
+type InjectPrefix<T extends string, Pre extends string> = T extends ""
   ? T
-  : T extends `${string}${R}${S}`
+  : Pre extends ""
     ? T
-    : `${T}${R}${S}`
+    : T extends `${Pre}${string}`
+      ? T
+      : `${Pre}${T}`
+
+/**
+ * Injects a suffix into a string if it doesn't already end with it.
+ *
+ * @template S - The suffix to inject
+ * @template R - The replacement character
+ * @template T - The target string
+ * @template D - The delimiter (default ".")
+ * @template Scope - The color scope (default "bg" | "fg" | "foreground" | "background")
+ * @returns The target string with the suffix injected if necessary
+ */
+type InjectSuffix<
+  T extends string,
+  Suf extends string,
+  Rep extends string,
+  Del extends string = ".",
+  Scope extends string = DefaultColorScope,
+> = T extends "" ? T : Suf extends "" ? T : T extends `${string}${Del | Rep}${Scope}` ? `${T}${Rep}${Suf}` | T : T
 
 const defaultPlugins = {
   /** Lighten the color by an amount */
@@ -106,124 +106,177 @@ const defaultPlugins = {
   darken,
 } as const
 
-type DefaultPlugins = typeof defaultPlugins
-
+type BasePlugins = typeof defaultPlugins
 type AnyPlugins = Record<string, Dye.PluginFunction>
-
 type BuiltinVariants = "lighter" | "darker"
-
 type VariantFn<P extends AnyPlugins> = (color: Dye.Instance<P>, token: string) => Dye.Instance<P>
 
-type VariantTransformers<K extends string, P extends AnyPlugins = typeof defaultPlugins> = Record<K, VariantFn<P>>
+/**
+ * Factory for creating color variants.
+ *
+ * @template K - The variant name (e.g., "lighter", "darker")
+ * @template P - The plugins available to the color instance
+ * @template R - The return type (RGB object, hex string, etc.)
+ */
+type VariantFactory<K extends string, P extends AnyPlugins = BasePlugins> = Record<K, VariantFn<P>>
 
-const builtinVariants: VariantTransformers<BuiltinVariants> = {
+const defaultVariants: VariantFactory<BuiltinVariants> = {
   lighter: (c) => c.lighten(0.12),
   darker: (c) => c.darken(0.12),
 }
 
-// type Serializer = (c: Dye.Instance<typeof defaultPlugins>, token: string) => string
-type Serializer<P extends AnyPlugins = typeof defaultPlugins, R extends Colors.Any | string = Colors.Rgb> = (
+/**
+ * Color serializer function type. Used to generate standardized colors
+ *
+ * @example
+ * ```ts
+ * // RGB ColorSerializer (default)
+ * const rgbColorSerializer: ColorSerializer = (c) => c.rgb;
+ *
+ * // Hex string ColorSerializer
+ * const hexColorSerializer: ColorSerializer<BasePlugins, string> =
+ *   (c) => c.toHex();
+ *
+ * // CSS variable ColorSerializer
+ * const cssColorSerializer: ColorSerializer<BasePlugins, string> =
+ *   (c, token) => `var(${token})`;
+ * ```
+ */
+type ColorSerializer<P extends AnyPlugins = BasePlugins, R extends Colors.Any | string = Colors.Rgb> = (
   c: Dye.Instance<P>,
   token: string,
 ) => R
 
-const defaultSerializer: Serializer = (c) => c.rgb
+const defaultColorSerializer: ColorSerializer = (c) => c.rgb
 
-const defaultLogger = {
+/**
+ * Logger interface for the theming system.
+ *
+ * @example
+ * ```ts
+ * // Custom logger using a logging library
+ * const myLogger: Logger = {
+ *   warn: (msg) => logLib.warning(`[Theme] ${msg}`),
+ *   error: (msg) => logLib.error(`[Theme] ${msg}`)
+ * }
+ *
+ * // Silent logger
+ * const silentLogger: Logger = {
+ *   warn: () => {},
+ *   error: () => {}
+ * }
+ * ```
+ */
+type Logger = typeof consoleLogger
+
+const consoleLogger = {
   warn: (message: string) => console.warn(message),
   error: (message: string) => console.error(message),
 }
 
-type Logger = typeof defaultLogger
-
 /**
- * A modern, type-safe theming system for creating and managing design tokens.
- * Handles color transformations, variant generation, and format standardization.
+ * A modern, type-safe theming system that orchestrates colors, variants,
+ * and tokens to create cohesive design themes. It handles transformations,
+ * variants, and formatting with precision and flair.
  *
- * @template TKey - The base theme token type
- * @template TPrefix - String prefix to apply to all generated tokens
- * @template TDivider - Character used to separate token parts
- * @template TEnforcedKey - Variant-enhanced tokens with proper structure
- * @template TFormattedKey - Final formatted token with applied prefix and divider
+ * @template TKey The token format (e.g., "button.primary", "text.color")
+ * @template TPrefix Prefix for generated tokens (e.g., "--" for CSS vars)
+ * @template TDivider Character for token parts (e.g., "-" or "_")
+ * @template TPlugins Color manipulation plugins available to the manager
+ * @template TVariantsKeys Names of color variants (e.g., "lighter", "darker")
+ * @template TColorValue Output format for colors (RGB, hex string, etc.)
+ * @template TVariants Color variants and their transformations
+ * @template TColorSerializer Color serializer for output format
+ * @template TScopedColorToken Scoped color tokens (e.g., "bg", "fg")
  */
 class ThemeManager<
-  TKey extends ThemeToken = ThemeToken,
+  TKey extends TokenName = TokenName,
   TPrefix extends string = "",
-  TDivider extends string = "-",
+  TDivider extends string = ".",
+  TScopedColorToken extends string = DefaultColorScope,
   TPlugins extends Dye.Plugins = Dye.Plugins,
   TVariantsKeys extends string = BuiltinVariants,
-  TColorFormat extends Colors.Any | string = Colors.Rgb,
-  TVariants extends VariantTransformers<TVariantsKeys, TPlugins> = VariantTransformers<TVariantsKeys, TPlugins>,
-  TSerializer extends Serializer<TPlugins, TColorFormat> = Serializer<TPlugins, TColorFormat>,
-> extends Colorus<DefaultPlugins | TPlugins> {
-  /**
-   * Registry of all valid token keys.
-   */
-  readonly tokens: Set<TKey>
-
-  readonly colors: Record<TKey, ColorFormat>
-
-  readonly variants: TVariants
-
-  readonly serializer: TSerializer
-
-  /**
-   * Prefix applied to all generated tokens (e.g., "--" for CSS variables).
-   */
-  readonly prefix: TPrefix
+  TColorValue extends Colors.Any | string = Colors.Rgb,
+  TVariants extends VariantFactory<TVariantsKeys, TPlugins> = VariantFactory<TVariantsKeys, TPlugins>,
+  TColorSerializer extends ColorSerializer<TPlugins, TColorValue> = ColorSerializer<TPlugins, TColorValue>,
+> extends Colorus<BasePlugins | TPlugins> {
+  private readonly tokens: Set<TKey>
+  private readonly colors: Record<TKey, ColorValue>
+  private readonly variants: TVariants
+  private readonly colorSerializer: TColorSerializer
+  private readonly colorScope: Array<TScopedColorToken>
+  private readonly prefix: TPrefix
+  private readonly divider: TDivider
+  private readonly logger: Logger
+  private baseColorSchema?: Record<string, TColorValue>
 
   /**
-   * Character used to separate parts of token names (e.g., "-" or "_").
-   */
-  readonly divider: TDivider
-
-  /**
-   * Logger for outputting messages and errors.
-   */
-  readonly logger: Logger
-
-  /**
-   * Creates a new theme instance with the specified colors and formatting options.
+   * Creates a new ThemeManager instance.
    *
-   * @param options - Configuration object
-   * @param options.colors - Base color definitions using token keys
-   * @param options.output - Formatting options for the generated tokens
-   * @param options.output.prefix - Prefix to apply to all tokens (e.g., "--" for CSS variables)
-   * @param options.output.divider - Character to use between token parts (default: ".")
+   * @param options Configuration options for the theme manager
+   *
+   * @example
+   * ```typescript
+   * // Basic theme with CSS variable output
+   * const theme = new ThemeManager({
+   *   colors: {
+   *     "button.primary": "#3366ff",
+   *     "button.secondary": "#99aabb",
+   *     "text.foreground": "#333333"
+   *   },
+   *   output: {
+   *     prefix: "--",
+   *     divider: "-"
+   *   }
+   * });
+   *
+   * // Type-safe access to your colors
+   * const schema = theme.generateTheme();
+   * // schema is fully typed! Try schema["--button-primary"]
+   *
+   * // Custom variants
+   * const themePlus = new ThemeManager({
+   *   colors: { "accent.primary": "#ff4500" },
+   *   variants: {
+   *     lighter: c => c.lighten(0.2),
+   *     darker: c => c.darken(0.2),
+   *     vibrant: c => c.saturate(0.3)
+   *   }
+   * });
+   * // Now you get "accent-primary-vibrant" automatically!
+   * ```
    */
   constructor(options: {
     logger?: Logger
     strict?: boolean
-    colors: Record<TKey, ColorFormat>
-    plugins?: Partial<DefaultPlugins> | Partial<TPlugins>
-    serializer?: Serializer<TPlugins, TColorFormat>
+    scope?: Array<TScopedColorToken>
+    plugins?: Partial<BasePlugins> | Partial<TPlugins>
     variants?: Record<TVariantsKeys, VariantFn<TPlugins>>
-    output?: {
-      prefix?: TPrefix
-      divider?: TDivider
-    }
+    colors: { [key in TKey]: ColorValue }
+    output?: { prefix?: TPrefix; divider?: TDivider; serializer?: ColorSerializer<TPlugins, TColorValue> }
   }) {
     const { colors, output, strict } = options
     super({
-      plugins: { ...defaultPlugins, ...options.plugins } as DefaultPlugins & TPlugins,
+      plugins: { ...defaultPlugins, ...options.plugins } as BasePlugins & TPlugins,
       parsers: [hexParser, rgbParser, hslParser, hsvParser, cmykParser],
     })
     this.tokens = new Set(Object.keys(colors)) as Set<TKey>
     this.colors = colors
-    this.serializer = (options.serializer || defaultSerializer) as TSerializer
-    this.variants = (options.variants || builtinVariants) as unknown as TVariants
+    this.colorScope = options.scope || (["bg", "fg", "foreground", "background"] as Array<TScopedColorToken>)
+    this.colorSerializer = (options.output?.serializer || defaultColorSerializer) as TColorSerializer
+    this.variants = (options.variants || defaultVariants) as unknown as TVariants
     this.prefix = output?.prefix || ("" as TPrefix)
     this.divider = output?.divider || ("." as TDivider)
-    this.logger = this.createLogger(options.logger || defaultLogger, strict || false)
+    this.logger = ThemeManager.createLogger(options.logger || consoleLogger, strict || false)
   }
 
-  createLogger(logger: Logger, strict: boolean) {
+  static createLogger(logger: Logger, strict: boolean) {
     if (!strict) {
       return logger
     }
 
     const res = {} as Logger
-    for (const [key, _] of Object.entries(defaultLogger)) {
+    for (const [key, _] of Object.entries(consoleLogger)) {
       res[key as unknown as keyof Logger] = (message: string) => {
         throw new Error(`[Theme-Manager]: ${message.replace("Skipping...", "")}`)
       }
@@ -239,118 +292,170 @@ class ThemeManager<
    * @returns Complete schema with processed colors and variants
    * @private
    */
-  buildSchema<
+  generateTheme<
     SVariantsKeys extends string = TVariantsKeys,
-    SKeys extends string = TKey,
-    TFormattedKey extends TokenFormatter<SKeys, ".", TDivider, TPrefix, SVariantsKeys> = TokenFormatter<
-      SKeys,
+    TFormattedKey extends FormatToken<TKey, ".", TDivider, TPrefix, SVariantsKeys, TScopedColorToken> = FormatToken<
+      TKey,
       ".",
       TDivider,
       TPrefix,
-      SVariantsKeys
+      SVariantsKeys,
+      TScopedColorToken
     >,
-  >(colors?: Record<SKeys, ColorFormat>): Record<TFormattedKey, TColorFormat> {
-    const serializer = this.serializer
+  >(colors?: {
+    [key in TKey]?: ColorValue
+  }): Record<TFormattedKey, TColorValue> {
+    // If no colors are provided and a base color schema exists, return it
+    // This allows for reusing the schema without regenerating it
+    if (!colors && this.baseColorSchema) {
+      return this.baseColorSchema as Record<TFormattedKey, TColorValue>
+    }
+
+    // Initialize core dependencies
+    const ColorSerializer = this.colorSerializer
     const variants = this.variants!
     const tokens = this.tokens
-    let schemaColors = colors as unknown as Record<TKey, ColorFormat>
 
-    if (!colors) {
-      schemaColors = this.colors
-    }
-
+    // Determine which color set to use
+    const schemaColors = colors || (this.colors as Record<TKey, ColorValue>)
     const colorKeys = Object.keys(schemaColors) as TKey[]
-    const colorKeysSet = new Set(colorKeys)
 
-    const schema = {} as Record<TFormattedKey, TColorFormat>
+    // Initialize the result schema
+    let schema = {} as Record<TFormattedKey, TColorValue>
 
-    for (const colorKey of colorKeysSet) {
-      if (!tokens.has(colorKey as TKey)) {
-        this.logger.warn(`Token ${String(colorKey)} is not in the registry.  Skipping...`)
+    // Process each color token
+    for (const token of colorKeys) {
+      // Validate token exists in registry
+      if (!tokens.has(token as TKey)) {
+        this.logger.warn(`Token ${String(token)} is not in the registry. Skipping...`)
         continue
       }
 
-      const color = schemaColors[colorKey as TKey] as ColorFormat
+      const colorValue = schemaColors[token as TKey] as ColorValue
 
-      if (!color) {
-        this.logger.warn(`Token ${String(colorKey)} has no color.  Skipping...`)
+      // Skip tokens without valid color values
+      if (!colorValue) {
+        this.logger.warn(`Token ${String(token)} has no color. Skipping...`)
         continue
       }
 
-      const processedColor = this.dye(color) as Dye.Instance<DefaultPlugins & TPlugins>
+      // Process base color
+      const processedColor = this.dye(colorValue) as Dye.Instance<BasePlugins & TPlugins>
       if (processedColor) {
-        const formattedColor = serializer(processedColor, colorKey)
-        const key = `${this.prefix}${colorKey.replace(/\./g, this.divider)}` as TFormattedKey
-
-        schema[key] = formattedColor as TColorFormat
+        // Format token name with prefix and dividers
+        const formattedKey = `${this.prefix}${token.replace(/\./g, this.divider)}` as TFormattedKey
+        schema[formattedKey] = ColorSerializer(processedColor, token) as TColorValue
       }
 
-      if ((colorKey as TKey)?.match(/\.(fg|bg|foreground|background)$/)) {
-        for (const variantKey of Object.keys(variants)) {
-          const transformer = variants[variantKey as keyof typeof variants] as VariantFn<DefaultPlugins & TPlugins>
-
-          const processedColor = this.dye(color) as Dye.Instance<DefaultPlugins & TPlugins>
-          const variantColor = transformer(processedColor, variantKey)
-
-          if (!variantColor.source.isValid) {
-            this.logger.warn(`Token ${String(colorKey)} has no color.  Skipping...`)
-            continue
-          }
-
-          const key =
-            `${this.prefix}${colorKey.replace(/\./g, this.divider)}${this.divider}${variantKey}` as TFormattedKey
-          schema[key] = serializer(variantColor, variantKey) as TColorFormat
-        }
+      // Process variants for fg/bg tokens
+      const isColorScopedToken = this.colorScope.some((scope) => token.endsWith(`.${scope}`))
+      if (isColorScopedToken && processedColor) {
+        this.appendVariants(token, processedColor, variants, ColorSerializer, schema)
       }
     }
 
-    return schema as unknown as Record<TFormattedKey, TColorFormat>
+    // If a base color schema is provided, use it to merge with the generated schema
+    if (this.baseColorSchema) {
+      schema = { ...this.baseColorSchema, ...schema } as Record<TFormattedKey, TColorValue>
+    }
+
+    // Cache the schema if this is the first build with no custom colors
+    if (!colors && !this.baseColorSchema) {
+      this.baseColorSchema = schema
+    }
+
+    return schema as unknown as Record<TFormattedKey, TColorValue>
+  }
+
+  /**
+   * Helper method to generate variants for a color token
+   * @private
+   */
+  private appendVariants<
+    TFormattedKey extends string,
+    TPluginsType extends Dye.Plugins,
+    VVariantsKeys extends string = TVariantsKeys,
+  >(
+    token: string,
+    baseColor: Dye.Instance<TPluginsType>,
+    variants: Record<VVariantsKeys, VariantFn<TPluginsType>>,
+    ColorSerializer: (c: Dye.Instance<TPluginsType>, token: string) => any,
+    schema: Record<TFormattedKey, any>,
+  ): void {
+    for (const variantKey of Object.keys(variants)) {
+      const transformer = variants[variantKey as keyof typeof variants] as VariantFn<TPluginsType>
+
+      // Apply the variant transformation
+      const variantColor = transformer(baseColor, variantKey)
+
+      // Skip invalid color results
+      if (!variantColor.source.isValid) {
+        this.logger.warn(`Variant ${variantKey} for token ${token} produced invalid color. Skipping...`)
+        continue
+      }
+
+      // Create the formatted variant key: token-variantKey
+      const formattedVariantKey =
+        `${this.prefix}${token.replace(/\./g, this.divider)}${this.divider}${variantKey}` as TFormattedKey
+
+      // Add to schema
+      schema[formattedVariantKey] = ColorSerializer(variantColor, variantKey)
+    }
+  }
+
+  /**
+   * Parses a JSON string and generates a theme schema. Useful for loading themes from external JSON files.
+   *
+   * @template SVariantsKeys - The variant keys to use for formatting
+   * @template TFormattedKey - The formatted key type
+   * @param json - The JSON string to parse
+   * @returns A record of formatted keys and their corresponding color values
+   */
+  parseFromJson<
+    SVariantsKeys extends string = TVariantsKeys,
+    TFormattedKey extends FormatToken<TKey, ".", TDivider, TPrefix, SVariantsKeys, TScopedColorToken> = FormatToken<
+      TKey,
+      ".",
+      TDivider,
+      TPrefix,
+      SVariantsKeys,
+      TScopedColorToken
+    >,
+  >(json: string): Record<TFormattedKey, TColorValue | undefined> {
+    const parsed = JSON.parse(json) as Record<TKey, ColorValue>
+
+    if (!parsed) {
+      this.logger.error("Invalid JSON format. Unable to parse theme.")
+      return {} as Record<TFormattedKey, TColorValue | undefined>
+    }
+
+    // Warns that a basse color schema is recommended for proper validation
+    if (!this.baseColorSchema) {
+      this.logger.warn(
+        "No base color schema provided. Some colors may not be validated correctly. Consider using a base color schema.",
+      )
+    }
+
+    return this.generateTheme(parsed) as Record<TFormattedKey, TColorValue | undefined>
   }
 }
 
-const internals = { builtinVariants, defaultLogger }
+const __internal__ = { defaultVariants, consoleLogger }
 
-export { internals, ThemeManager }
+export * from "colorus-js"
+export { __internal__, ThemeManager }
 
 export type {
+  AnyPlugins,
+  BasePlugins,
   BuiltinVariants,
-  ColorFormat,
+  ColorSerializer,
+  ColorValue,
+  DefaultColorScope,
+  FormatToken,
+  InjectPrefix,
   Logger,
-  NamespacedColorToken,
-  PrefixInjector,
-  ScopedColorToken,
-  ThemeToken,
-  TokenFormatter,
+  TokenName,
+  VariantFactory,
+  VariantFn,
 }
-
-// Usage example
-
-const theme = new ThemeManager({
-  colors: {
-    "accent.fg": "hsl(11, 100%, 60%)",
-    "primary.bg": "#581845",
-  },
-})
-
-const dv = theme.divider
-
-const generatedPalette = theme.buildSchema()
-
-const variant = theme.buildSchema({
-  "accent.fg": "hsl(11, 20%, 60%)",
-})
-
-console.debug({ generatedPalette, variant })
-
-/**
-{
-  generatedPalette: {
-    "accent-fg": "hsl(11, 100%, 60%)",
-    "accent-fg-ligthest": "hsl(11, 20%, 60%)",
-    "accent-fg-brighter": "hsl(11, 100%, 68%)",
-    "primary-bg": "hsl(318, 57%, 22%)",
-    "primary-bg-ligthest": "hsl(318, 11%, 22%)",
-    "primary-bg-brighter": "hsl(318, 69%, 25%)",
-  },
-}
-*/

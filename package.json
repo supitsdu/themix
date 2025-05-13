@@ -1,7 +1,7 @@
 {
-  "name": "themix",
+  "name": "@colorus-js/themix",
   "version": "1.0.0",
-  "description": "",
+  "description": "Build modern, type-safe theming systems",
   "main": "./dist/main.cjs",
   "type": "module",
   "module": "./dist/main.mjs",
@@ -37,41 +37,37 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/supitsdu/climonad.js.git"
+    "url": "git+https://github.com/supitsdu/themix.git"
   },
   "keywords": [
-    "cli",
-    "command-line",
-    "arguments",
-    "parser",
-    "high-performance",
-    "nodejs",
-    "typescript",
-    "commander",
-    "options",
-    "flags",
-    "terminal",
-    "command",
-    "argv"
+    "theme",
+    "theming",
+    "css",
+    "color",
+    "schema",
+    "design"
   ],
   "author": "Eduardo M. Santos <contact@supitsdu.me>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/supitsdu/climonad.js/issues"
+    "url": "https://github.com/supitsdu/themix/issues"
   },
-  "homepage": "https://github.com/supitsdu/climonad.js#readme",
+  "homepage": "https://github.com/supitsdu/themix#readme",
   "engines": {
     "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "colorus-js": "^2.1.0"
   },
   "peerDependencies": {
     "node": ">=20.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@rollup/plugin-node-resolve": "^16.0.1",
     "@rollup/plugin-typescript": "^12.1.2",
     "@types/node": "^22.10.2",
     "@vitest/coverage-v8": "^3.1.2",
-    "colorus-js": "^2.1.0",
     "eslint": "^9.17.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-vue": "^9.32.0",

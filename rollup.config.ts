@@ -2,19 +2,21 @@ import typescript from "@rollup/plugin-typescript"
 import { reportDetails } from "rollup-plugin-bundlens"
 import dts from "rollup-plugin-dts"
 import esbuild from "rollup-plugin-esbuild"
+import { nodeResolve } from "@rollup/plugin-node-resolve"
 
-const external = []
+const external = ["colorus-js"]
 
 export default [
   {
     input: ["src/index.ts"],
-    plugins: [typescript(), reportDetails()],
+    plugins: [nodeResolve(), typescript(), reportDetails()],
     output: { dir: "build", format: "es", exports: "auto" },
     external,
   },
   {
     input: "build/index.js",
     plugins: [
+      nodeResolve(),
       esbuild({ minify: true, target: "esnext", minifyIdentifiers: true, minifySyntax: true, minifyWhitespace: true }),
       reportDetails(),
     ],
