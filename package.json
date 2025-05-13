@@ -1,6 +1,6 @@
 {
   "name": "themix",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Build modern, type-safe theming systems",
   "main": "./dist/main.cjs",
   "type": "module",
