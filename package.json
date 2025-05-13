@@ -1,5 +1,5 @@
 {
-  "name": "themix",
+  "name": "@colorus-js/themix",
   "version": "1.0.0",
   "description": "Build modern, type-safe theming systems",
   "main": "./dist/main.cjs",

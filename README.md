@@ -9,7 +9,7 @@ Managing multiple themes in an application can quickly become complex. Ensuring 
 ## Installation
 
 ```bash
-npm install themix
+npm install @colorus-js/themix
 ```
 
 ## Quick Start
@@ -17,7 +17,7 @@ npm install themix
 Create strongly typed, customizable themes easily:
 
 ```javascript
-import { ThemeManager, toHex, saturate, lighten, darken } from "themix"
+import { ThemeManager, toHex, saturate, lighten, darken } from "@colorus-js/themix"
 
 const theme = new ThemeManager({
   colors: {
